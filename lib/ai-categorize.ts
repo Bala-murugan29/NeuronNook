@@ -149,7 +149,7 @@ export async function categorizeEmailWithGemini(email: {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
 
     const prompt = `Categorize this email into one of three categories:
 - personal: Personal emails from friends, family, personal subscriptions, personal notifications
@@ -233,7 +233,7 @@ export async function categorizeFileWithGemini(file: {
     throw new Error("Gemini API key not configured")
   }
 
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
 
   const prompt = `Categorize this file into one of three categories:
 - personal: Personal files like photos, personal documents, entertainment, personal projects
@@ -335,7 +335,7 @@ export async function generateDashboardInsights(
     throw new Error("Gemini API key not configured")
   }
 
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
 
   // Calculate metrics
   const totalItems = dashboardData.items.length

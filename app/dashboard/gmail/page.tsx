@@ -34,7 +34,7 @@ export default function GmailPage() {
     setError(null)
 
     try {
-      const res = await fetch("/api/gmail?maxResults=30")
+      const res = await fetch("/api/gmail?maxResults=30", { credentials: "include" })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || "Failed to fetch emails")
@@ -69,6 +69,7 @@ export default function GmailPage() {
       const endpoint = "/api/gmail/categorize-gemini"
       const res = await fetch(endpoint, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emails: emailsForApi }),
       })

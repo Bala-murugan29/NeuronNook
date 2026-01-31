@@ -76,7 +76,6 @@ export async function GET(request: NextRequest) {
       const existingUser = await findUserByEmail(session.email)
       if (existingUser) {
         await updateUser(existingUser.id, {
-          email: existingUser.data.email,
           microsoftConnected: true,
           microsoftAccessToken: tokens.access_token,
           microsoftRefreshToken: tokens.refresh_token,
@@ -97,13 +96,11 @@ export async function GET(request: NextRequest) {
         microsoftRefreshToken: tokens.refresh_token,
       })
     } else {
-      await updateUser(userRecord.id, {
-        email,
+      userRecord = await updateUser(userRecord.id, {
         microsoftConnected: true,
         microsoftAccessToken: tokens.access_token,
         microsoftRefreshToken: tokens.refresh_token,
       })
-      userRecord = await findUserByEmail(email)
     }
 
     if (!userRecord) {

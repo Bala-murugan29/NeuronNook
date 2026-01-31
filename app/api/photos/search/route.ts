@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSessionToken, verifySession } from "@/lib/auth"
-import { findUserByEmail, dbRecordToUser } from "@/lib/db"
+import { getSessionToken, verifySession, refreshGoogleAccessToken } from "@/lib/auth"
+import { findUserByEmail, dbRecordToUser, updateUser } from "@/lib/db"
 
 export async function POST(request: NextRequest) {
   const token = await getSessionToken()
@@ -22,6 +22,28 @@ export async function POST(request: NextRequest) {
 
   if (!user.googleConnected || !user.googleAccessToken) {
     return NextResponse.json({ error: "Google not connected" }, { status: 403 })
+  }
+
+  let accessToken = user.googleAccessToken
+
+  // Try to refresh token if we have a refresh token
+  if (user.googleRefreshToken) {
+    try {
+      const newToken = await refreshGoogleAccessToken(user.googleRefreshToken)
+      if (newToken) {
+        accessToken = newToken
+        // Update the user's access token in the database
+        try {
+          await updateUser(user.id, { googleAccessToken: newToken })
+        } catch (updateError) {
+          console.error("Failed to update token in database:", updateError)
+          // Continue with the new token anyway
+        }
+      }
+    } catch (refreshError) {
+      console.error("Failed to refresh token:", refreshError)
+      // Continue with the old token
+    }
   }
 
   const apiKey = process.env.GMAIL_API_KEY
@@ -93,7 +115,7 @@ export async function POST(request: NextRequest) {
     const photosRes = await fetch(searchUrl.toString(), {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${user.googleAccessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(searchBody),

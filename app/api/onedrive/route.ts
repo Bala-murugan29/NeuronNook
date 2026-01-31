@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSessionToken, verifySession } from "@/lib/auth"
-import { findUserByEmail, dbRecordToUser } from "@/lib/db"
+import { getSessionToken, verifySession, refreshMicrosoftAccessToken } from "@/lib/auth"
+import { findUserByEmail, dbRecordToUser, updateUser } from "@/lib/db"
 
 export async function GET(request: NextRequest) {
   const token = await getSessionToken()
@@ -24,6 +24,28 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Microsoft not connected" }, { status: 403 })
   }
 
+  let accessToken = user.microsoftAccessToken
+
+  // Try to refresh token if we have a refresh token
+  if (user.microsoftRefreshToken) {
+    try {
+      const newToken = await refreshMicrosoftAccessToken(user.microsoftRefreshToken)
+      if (newToken) {
+        accessToken = newToken
+        // Update the user's access token in the database
+        try {
+          await updateUser(user.id, { microsoftAccessToken: newToken })
+        } catch (updateError) {
+          console.error("Failed to update token in database:", updateError)
+          // Continue with the new token anyway
+        }
+      }
+    } catch (refreshError) {
+      console.error("Failed to refresh token:", refreshError)
+      // Continue with the old token
+    }
+  }
+
   const { searchParams } = new URL(request.url)
   const top = searchParams.get("top") || "50"
   const skipToken = searchParams.get("skipToken") || ""
@@ -36,12 +58,24 @@ export async function GET(request: NextRequest) {
     }
 
     const driveRes = await fetch(driveUrl, {
-      headers: { Authorization: `Bearer ${user.microsoftAccessToken}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
     })
 
     if (!driveRes.ok) {
-      const error = await driveRes.json()
-      return NextResponse.json({ error: error.error?.message || "Failed to fetch files" }, { status: driveRes.status })
+      const errorText = await driveRes.text()
+      console.error("OneDrive API error:", {
+        status: driveRes.status,
+        body: errorText,
+      })
+      try {
+        const error = JSON.parse(errorText)
+        return NextResponse.json(
+          { error: error.error?.message || "Failed to fetch files" },
+          { status: driveRes.status },
+        )
+      } catch {
+        return NextResponse.json({ error: errorText || "Failed to fetch files" }, { status: driveRes.status })
+      }
     }
 
     const data = await driveRes.json()

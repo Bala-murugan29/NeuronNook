@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSessionToken, verifySession } from "@/lib/auth"
-import { findUserByEmail, dbRecordToUser } from "@/lib/db"
+import { getSessionToken, verifySession, refreshGoogleAccessToken } from "@/lib/auth"
+import { findUserByEmail, dbRecordToUser, updateUser } from "@/lib/db"
 
 export async function GET(request: NextRequest) {
   const token = await getSessionToken()
@@ -24,6 +24,28 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Google not connected" }, { status: 403 })
   }
 
+  let accessToken = user.googleAccessToken
+
+  // Try to refresh token if we have a refresh token
+  if (user.googleRefreshToken) {
+    try {
+      const newToken = await refreshGoogleAccessToken(user.googleRefreshToken)
+      if (newToken) {
+        accessToken = newToken
+        // Update the user's access token in the database
+        try {
+          await updateUser(user.id, { googleAccessToken: newToken })
+        } catch (updateError) {
+          console.error("Failed to update token in database:", updateError)
+          // Continue with the new token anyway
+        }
+      }
+    } catch (refreshError) {
+      console.error("Failed to refresh token:", refreshError)
+      // Continue with the old token
+    }
+  }
+
   const apiKey = process.env.GMAIL_API_KEY
 
   const { searchParams } = new URL(request.url)
@@ -41,15 +63,24 @@ export async function GET(request: NextRequest) {
     }
 
     const photosRes = await fetch(photosUrl.toString(), {
-      headers: { Authorization: `Bearer ${user.googleAccessToken}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
     })
 
     if (!photosRes.ok) {
-      const error = await photosRes.json()
-      return NextResponse.json(
-        { error: error.error?.message || "Failed to fetch photos" },
-        { status: photosRes.status },
-      )
+      const errorText = await photosRes.text()
+      console.error("Google Photos API error:", {
+        status: photosRes.status,
+        body: errorText,
+      })
+      try {
+        const error = JSON.parse(errorText)
+        return NextResponse.json(
+          { error: error.error?.message || "Failed to fetch photos" },
+          { status: photosRes.status },
+        )
+      } catch {
+        return NextResponse.json({ error: errorText || "Failed to fetch photos" }, { status: photosRes.status })
+      }
     }
 
     const data = await photosRes.json()

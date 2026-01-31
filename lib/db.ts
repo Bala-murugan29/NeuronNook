@@ -123,6 +123,11 @@ export async function updateUser(
 
   const now = new Date().toISOString()
 
+  const setOnInsert: { email?: string; createdAt: string } = { createdAt: now }
+  if (userData.email) {
+    setOnInsert.email = userData.email
+  }
+
   const result = (await col.findOneAndUpdate(
     { $or: queries },
     {
@@ -130,17 +135,26 @@ export async function updateUser(
         ...userData,
         updatedAt: now,
       },
-      $setOnInsert: {
-        email: userData.email,
-        createdAt: now,
-      },
+      $setOnInsert: setOnInsert,
     },
     { returnDocument: "after", upsert: true },
   )) as ModifyResult<DbUser> | null
 
-  const value = result?.value
+  let value = result?.value
+  
+  // If findOneAndUpdate returns null but we expect a document to exist,
+  // try fetching it again by id to ensure we get the updated document
   if (!value) {
-    throw new Error(`Failed to update user with id: ${id}`)
+    const queries2: Array<{ _id?: ObjectId | string; email?: string }> = ObjectId.isValid(id)
+      ? [{ _id: new ObjectId(id) }, { _id: id }]
+      : [{ _id: id }]
+    
+    const existingUser = await col.findOne({ $or: queries2 })
+    if (existingUser) {
+      value = existingUser
+    } else {
+      throw new Error(`Failed to update user with id: ${id}`)
+    }
   }
 
   return docToRecord(value)

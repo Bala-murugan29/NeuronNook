@@ -41,7 +41,7 @@ function PhotosContent() {
     setIsFiltered(false)
 
     try {
-      const res = await fetch("/api/photos?pageSize=50")
+      const res = await fetch("/api/photos?pageSize=50", { credentials: "include" })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || "Failed to fetch photos")
@@ -71,6 +71,7 @@ function PhotosContent() {
     try {
       const res = await fetch("/api/photos/search", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           startDate: startDate || undefined,
@@ -128,6 +129,7 @@ function PhotosContent() {
 
       const res = await fetch("/api/photos/categorize", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ photos: photosForApi }),
       })

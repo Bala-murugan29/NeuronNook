@@ -47,7 +47,7 @@ export default function DrivePage() {
     setError(null)
 
     try {
-      const res = await fetch("/api/drive?pageSize=50")
+      const res = await fetch("/api/drive?pageSize=50", { credentials: "include" })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || "Failed to fetch files")
@@ -81,6 +81,7 @@ export default function DrivePage() {
       const endpoint = "/api/drive/categorize-gemini"
       const res = await fetch(endpoint, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ files: filesForApi }),
       })

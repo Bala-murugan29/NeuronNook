@@ -48,6 +48,24 @@ export async function GET(request: NextRequest) {
 
     const tokens = await tokenRes.json()
 
+    // Verify what scopes were actually granted
+    try {
+      const tokenInfoRes = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?access_token=${tokens.access_token}`,
+      )
+      if (tokenInfoRes.ok) {
+        const tokenInfo = await tokenInfoRes.json()
+        console.log("✅ Token granted with scopes:", tokenInfo.scope)
+        
+        // Check for Photos scopes specifically
+        const scopes = tokenInfo.scope ? tokenInfo.scope.split(" ") : []
+        const hasPhotos = scopes.some((s: string) => s.includes("photoslibrary"))
+        console.log(hasPhotos ? "✅ Google Photos scope GRANTED" : "❌ Google Photos scope MISSING")
+      }
+    } catch (e) {
+      console.error("Failed to verify token scopes:", e)
+    }
+
     // Get user info
     const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
@@ -77,7 +95,6 @@ export async function GET(request: NextRequest) {
       const existingUser = await findUserByEmail(session.email)
       if (existingUser) {
         await updateUser(existingUser.id, {
-          email: existingUser.data.email,
           googleConnected: true,
           googleAccessToken: tokens.access_token,
           googleRefreshToken: tokens.refresh_token,
@@ -101,15 +118,13 @@ export async function GET(request: NextRequest) {
         googleRefreshToken: tokens.refresh_token,
       })
     } else {
-      // Update existing user
-      await updateUser(userRecord.id, {
-        email: googleUser.email,
+      // Update existing user (don't pass email to avoid MongoDB conflict)
+      userRecord = await updateUser(userRecord.id, {
         googleConnected: true,
         googleAccessToken: tokens.access_token,
         googleRefreshToken: tokens.refresh_token,
         image: googleUser.picture,
       })
-      userRecord = await findUserByEmail(googleUser.email)
     }
 
     if (!userRecord) {

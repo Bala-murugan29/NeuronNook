@@ -11,6 +11,7 @@ const SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/drive.readonly",
   "https://www.googleapis.com/auth/photoslibrary.readonly",
+  "https://www.googleapis.com/auth/photoslibrary",
 ].join(" ")
 
 export async function GET(request: NextRequest) {
@@ -27,6 +28,11 @@ export async function GET(request: NextRequest) {
   authUrl.searchParams.set("access_type", "offline")
   authUrl.searchParams.set("prompt", "consent")
   authUrl.searchParams.set("state", Buffer.from(state).toString("base64"))
+  authUrl.searchParams.set("include_granted_scopes", "true") // Enable incremental authorization
+
+  // Log the OAuth URL for debugging (scopes verification)
+  console.log("🔐 Google OAuth URL:", authUrl.toString())
+  console.log("📋 Requested Scopes:", SCOPES)
 
   return NextResponse.redirect(authUrl.toString())
 }

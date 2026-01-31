@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSessionToken, verifySession } from "@/lib/auth"
-import { findUserByEmail, dbRecordToUser } from "@/lib/db"
+import { getSessionToken, verifySession, refreshGoogleAccessToken } from "@/lib/auth"
+import { findUserByEmail, dbRecordToUser, updateUser } from "@/lib/db"
 
 export async function GET(request: NextRequest) {
   const token = await getSessionToken()
@@ -24,6 +24,28 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Google not connected" }, { status: 403 })
   }
 
+  let accessToken = user.googleAccessToken
+
+  // Try to refresh token if we have a refresh token
+  if (user.googleRefreshToken) {
+    try {
+      const newToken = await refreshGoogleAccessToken(user.googleRefreshToken)
+      if (newToken) {
+        accessToken = newToken
+        // Update the user's access token in the database
+        try {
+          await updateUser(user.id, { googleAccessToken: newToken })
+        } catch (updateError) {
+          console.error("Failed to update token in database:", updateError)
+          // Continue with the new token anyway
+        }
+      }
+    } catch (refreshError) {
+      console.error("Failed to refresh token:", refreshError)
+      // Continue with the old token
+    }
+  }
+
   const apiKey = process.env.GMAIL_API_KEY
 
   const { searchParams } = new URL(request.url)
@@ -42,22 +64,31 @@ export async function GET(request: NextRequest) {
     }
 
     const messagesRes = await fetch(messagesUrl.toString(), {
-      headers: { Authorization: `Bearer ${user.googleAccessToken}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
     })
 
     if (!messagesRes.ok) {
-      const error = await messagesRes.json()
-      return NextResponse.json(
-        { error: error.error?.message || "Failed to fetch emails" },
-        { status: messagesRes.status },
-      )
+      const errorText = await messagesRes.text()
+      console.error("Gmail API error:", {
+        status: messagesRes.status,
+        body: errorText,
+      })
+      try {
+        const error = JSON.parse(errorText)
+        return NextResponse.json(
+          { error: error.error?.message || "Failed to fetch emails" },
+          { status: messagesRes.status },
+        )
+      } catch {
+        return NextResponse.json({ error: errorText || "Failed to fetch emails" }, { status: messagesRes.status })
+      }
     }
 
     const messagesData = await messagesRes.json()
     const messages = messagesData.messages || []
 
     // Fetch details for each message
-    const emailPromises = messages.slice(0, 20).map(async (msg: { id: string }) => {
+    const emailPromises = messages.map(async (msg: { id: string }) => {
       const detailUrl = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`)
       detailUrl.searchParams.set("format", "metadata")
       detailUrl.searchParams.append("metadataHeaders", "From")
@@ -69,7 +100,7 @@ export async function GET(request: NextRequest) {
       }
 
       const detailRes = await fetch(detailUrl.toString(), {
-        headers: { Authorization: `Bearer ${user.googleAccessToken}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
       })
 
       if (!detailRes.ok) return null

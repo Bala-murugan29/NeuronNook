@@ -50,3 +50,60 @@ export async function clearSessionCookie() {
   const cookieStore = await cookies()
   cookieStore.delete("session")
 }
+
+export async function refreshGoogleAccessToken(refreshToken: string): Promise<string | null> {
+  if (!refreshToken) return null
+
+  try {
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: process.env.GOOGLE_CLIENT_ID || "",
+        client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+      }),
+    })
+
+    if (!response.ok) {
+      console.error("Failed to refresh Google token:", await response.text())
+      return null
+    }
+
+    const data = await response.json()
+    return data.access_token as string
+  } catch (error) {
+    console.error("Error refreshing Google token:", error)
+    return null
+  }
+}
+
+export async function refreshMicrosoftAccessToken(refreshToken: string): Promise<string | null> {
+  if (!refreshToken) return null
+
+  try {
+    const response = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: process.env.MICROSOFT_CLIENT_ID || "",
+        client_secret: process.env.MICROSOFT_CLIENT_SECRET || "",
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+        scope: "offline_access mail.readonly calendar.readonly files.read",
+      }),
+    })
+
+    if (!response.ok) {
+      console.error("Failed to refresh Microsoft token:", await response.text())
+      return null
+    }
+
+    const data = await response.json()
+    return data.access_token as string
+  } catch (error) {
+    console.error("Error refreshing Microsoft token:", error)
+    return null
+  }
+}

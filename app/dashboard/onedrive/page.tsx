@@ -47,7 +47,7 @@ export default function OneDrivePage() {
     setError(null)
 
     try {
-      const res = await fetch("/api/onedrive?top=50")
+      const res = await fetch("/api/onedrive?top=50", { credentials: "include" })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || "Failed to fetch files")
@@ -80,6 +80,7 @@ export default function OneDrivePage() {
 
       const res = await fetch("/api/onedrive/categorize", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ files: filesForApi }),
       })
