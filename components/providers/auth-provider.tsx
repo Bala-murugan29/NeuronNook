@@ -21,7 +21,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/me", { credentials: "include" })
+      const res = await fetch("/api/auth/me", { 
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
       if (res.ok) {
         const user = await res.json()
         setState({
@@ -30,13 +35,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           isAuthenticated: true,
         })
       } else {
+        console.error("[AuthProvider] Failed to fetch user:", res.status, res.statusText)
         setState({
           user: null,
           isLoading: false,
           isAuthenticated: false,
         })
       }
-    } catch {
+    } catch (error) {
+      console.error("[AuthProvider] Error fetching user:", error)
       setState({
         user: null,
         isLoading: false,
