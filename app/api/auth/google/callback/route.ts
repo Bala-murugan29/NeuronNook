@@ -134,6 +134,8 @@ export async function GET(request: NextRequest) {
     const user = dbRecordToUser(userRecord)
     const sessionToken = await createSession(user)
 
+    console.log("[Google Callback] Session token created, setting cookie...")
+
     const response = NextResponse.redirect(new URL("/dashboard", request.url))
     response.cookies.set("session", sessionToken, {
       httpOnly: true,
@@ -142,6 +144,8 @@ export async function GET(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 7,
       path: "/",
     })
+
+    console.log("[Google Callback] Cookie set, redirecting to dashboard")
 
     return response
   } catch (error) {
