@@ -9,13 +9,18 @@ const GOOGLE_REDIRECT_URI =
 
 export async function GET(request: NextRequest) {
   try {
+    console.log("[Google Callback] Starting OAuth callback...")
+    
     const { searchParams } = new URL(request.url)
     const code = searchParams.get("code")
     const stateBase64 = searchParams.get("state")
 
     if (!code) {
+      console.error("[Google Callback] No authorization code received")
       return NextResponse.redirect(new URL("/?error=no_code", request.url))
     }
+
+    console.log("[Google Callback] Authorization code received, exchanging for tokens...")
 
     let isLinking = false
     if (stateBase64) {
@@ -47,6 +52,7 @@ export async function GET(request: NextRequest) {
     }
 
     const tokens = await tokenRes.json()
+    console.log("[Google Callback] Token exchange successful, access_token length:", tokens.access_token?.length)
 
     // Verify what scopes were actually granted
     try {
@@ -67,6 +73,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user info
+    console.log("[Google Callback] Fetching user info from Google...")
     const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     })
@@ -78,6 +85,7 @@ export async function GET(request: NextRequest) {
     }
 
     const googleUser = await userInfoRes.json()
+    console.log("[Google Callback] User info received:", { email: googleUser.email, name: googleUser.name })
 
     if (isLinking) {
       // Link account to existing user
@@ -105,34 +113,54 @@ export async function GET(request: NextRequest) {
     }
 
     // Normal login/signup flow
+    console.log("[Google Callback] Normal login flow, checking if user exists...")
     let userRecord = await findUserByEmail(googleUser.email)
+    console.log("[Google Callback] User lookup result:", userRecord ? "User found" : "User not found")
 
     if (!userRecord) {
       // Create new user
-      userRecord = await createUser({
-        email: googleUser.email,
-        name: googleUser.name,
-        image: googleUser.picture,
-        googleConnected: true,
-        googleAccessToken: tokens.access_token,
-        googleRefreshToken: tokens.refresh_token,
-      })
+      console.log("[Google Callback] Creating new user in database...")
+      try {
+        userRecord = await createUser({
+          email: googleUser.email,
+          name: googleUser.name,
+          image: googleUser.picture,
+          googleConnected: true,
+          googleAccessToken: tokens.access_token,
+          googleRefreshToken: tokens.refresh_token,
+        })
+        console.log("[Google Callback] User created successfully, id:", userRecord.id)
+      } catch (createError) {
+        console.error("[Google Callback] Failed to create user:", createError)
+        throw createError
+      }
     } else {
       // Update existing user (don't pass email to avoid MongoDB conflict)
-      userRecord = await updateUser(userRecord.id, {
-        googleConnected: true,
-        googleAccessToken: tokens.access_token,
-        googleRefreshToken: tokens.refresh_token,
-        image: googleUser.picture,
-      })
+      console.log("[Google Callback] Updating existing user...")
+      try {
+        userRecord = await updateUser(userRecord.id, {
+          googleConnected: true,
+          googleAccessToken: tokens.access_token,
+          googleRefreshToken: tokens.refresh_token,
+          image: googleUser.picture,
+        })
+        console.log("[Google Callback] User updated successfully")
+      } catch (updateError) {
+        console.error("[Google Callback] Failed to update user:", updateError)
+        throw updateError
+      }
     }
 
     if (!userRecord) {
+      console.error("[Google Callback] User record is null after upsert")
       throw new Error("User record missing after upsert")
     }
 
+    console.log("[Google Callback] Converting user record to user object...")
     const user = dbRecordToUser(userRecord)
+    console.log("[Google Callback] Creating session token...")
     const sessionToken = await createSession(user)
+    console.log("[Google Callback] Session token created, length:", sessionToken.length)
 
     console.log("[Google Callback] Session token created, setting cookie...")
 

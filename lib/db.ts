@@ -58,9 +58,17 @@ async function categorizationsCollection() {
 }
 
 export async function findUserByEmail(email: string): Promise<DbRecord<DbUser> | null> {
-  const col = await usersCollection()
-  const user = await col.findOne({ email })
-  return user ? docToRecord(user) : null
+  console.log("[DB] Finding user by email:", email)
+  try {
+    const col = await usersCollection()
+    console.log("[DB] Users collection obtained, querying...")
+    const user = await col.findOne({ email })
+    console.log("[DB] Query result:", user ? "User found" : "User not found")
+    return user ? docToRecord(user) : null
+  } catch (error) {
+    console.error("[DB] findUserByEmail failed:", error)
+    throw error
+  }
 }
 
 export async function findUserById(id: string): Promise<DbRecord<DbUser> | null> {
@@ -84,18 +92,27 @@ export async function createUser(userData: {
   microsoftAccessToken?: string
   microsoftRefreshToken?: string
 }): Promise<DbRecord<DbUser>> {
-  const col = await usersCollection()
-  const now = new Date().toISOString()
-  const doc: DbUser = {
-    ...userData,
-    googleConnected: userData.googleConnected ?? false,
-    microsoftConnected: userData.microsoftConnected ?? false,
-    createdAt: now,
-    updatedAt: now,
-  }
+  console.log("[DB] Creating user:", { email: userData.email, name: userData.name })
+  try {
+    const col = await usersCollection()
+    console.log("[DB] Users collection obtained")
+    const now = new Date().toISOString()
+    const doc: DbUser = {
+      ...userData,
+      googleConnected: userData.googleConnected ?? false,
+      microsoftConnected: userData.microsoftConnected ?? false,
+      createdAt: now,
+      updatedAt: now,
+    }
 
-  const result = await col.insertOne(doc)
-  return docToRecord({ ...doc, _id: result.insertedId })
+    console.log("[DB] Inserting document into MongoDB...")
+    const result = await col.insertOne(doc)
+    console.log("[DB] Insert successful, insertedId:", result.insertedId)
+    return docToRecord({ ...doc, _id: result.insertedId })
+  } catch (error) {
+    console.error("[DB] createUser failed:", error)
+    throw error
+  }
 }
 
 export async function updateUser(
