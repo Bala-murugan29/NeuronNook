@@ -129,8 +129,25 @@ export function LoginPage() {
 
       {/* Footer */}
       <footer className="border-t border-border mt-20">
-        <div className="container mx-auto px-6 py-8 text-center text-muted-foreground text-sm">
-          NeuronNook - Unified Cloud Dashboard
+        <div className="container mx-auto px-6 py-8">
+          <div className="text-center text-muted-foreground text-sm space-y-4">
+            <p>NeuronNook - Unified Cloud Dashboard</p>
+            <div className="flex items-center justify-center gap-6">
+              <a
+                href="/privacy-policy"
+                className="text-muted-foreground hover:text-primary transition-colors underline"
+              >
+                Privacy Policy
+              </a>
+              <a
+                href="/terms-and-conditions"
+                className="text-muted-foreground hover:text-primary transition-colors underline"
+              >
+                Terms and Conditions
+              </a>
+            </div>
+            <p className="text-xs">© 2026 NeuronNook. All rights reserved.</p>
+          </div>
         </div>
       </footer>
     </div>
