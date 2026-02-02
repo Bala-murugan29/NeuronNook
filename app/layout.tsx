@@ -13,6 +13,9 @@ export const metadata: Metadata = {
   title: "NeuronNook - Unified Cloud Dashboard",
   description: "Connect and manage your Google and Microsoft cloud services in one place",
   generator: "v0.app",
+  verification: {
+    google: "5XidJwKy1VJtavmLuSFQdiSCLvQNWdpw807Ea7YLfjM",
+  },
 }
 
 export default function RootLayout({
