@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { GoogleIcon, MicrosoftIcon, GmailIcon, DriveIcon, PhotosIcon, OneDriveIcon } from "@/components/icons"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
-import { Loader2, Cloud, Shield, Zap } from "lucide-react"
+import { Loader2, Shield, Zap } from "lucide-react"
 
 export function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuth()
@@ -34,8 +34,8 @@ export function LoginPage() {
       <header className="border-b border-border">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Cloud className="h-8 w-8 text-primary" />
-            <span className="text-xl font-semibold text-foreground">CloudHub</span>
+            <img src="/logowithouttext.png" alt="NeuronNook" className="h-8 w-8" />
+            <span className="text-xl font-semibold text-foreground">NeuronNook</span>
           </div>
         </div>
       </header>
@@ -120,7 +120,7 @@ export function LoginPage() {
             description="OAuth 2.0 authentication with encrypted tokens"
           />
           <BenefitCard
-            icon={<Cloud className="h-6 w-6 text-primary" />}
+            icon={<img src="/logowithouttext.png" alt="Unified" className="h-6 w-6" />}
             title="Unified"
             description="Access all your cloud services from one place"
           />
@@ -130,7 +130,7 @@ export function LoginPage() {
       {/* Footer */}
       <footer className="border-t border-border mt-20">
         <div className="container mx-auto px-6 py-8 text-center text-muted-foreground text-sm">
-          CloudHub - Unified Cloud Dashboard
+          NeuronNook - Unified Cloud Dashboard
         </div>
       </footer>
     </div>

@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/providers/auth-provider"
 import { GmailIcon, DriveIcon, PhotosIcon, OneDriveIcon, GoogleIcon, MicrosoftIcon } from "@/components/icons"
 import { Button } from "@/components/ui/button"
-import { Cloud, LayoutDashboard, LinkIcon, ChevronLeft, ChevronRight } from "lucide-react"
+import { LayoutDashboard, LinkIcon, ChevronLeft, ChevronRight } from "lucide-react"
+import Image from "next/image"
 import { useState } from "react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -35,8 +36,8 @@ export function DashboardSidebar() {
       >
         {/* Logo */}
         <div className="h-16 border-b border-sidebar-border flex items-center px-4 gap-2">
-          <Cloud className="h-8 w-8 text-sidebar-primary shrink-0" />
-          {!collapsed && <span className="text-lg font-semibold text-sidebar-foreground">CloudHub</span>}
+          <img src="/logowithouttext.png" alt="NeuronNook" className="h-8 w-8 shrink-0" />
+          {!collapsed && <span className="text-lg font-semibold text-sidebar-foreground">NeuronNook</span>}
         </div>
 
         {/* Navigation */}

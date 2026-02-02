@@ -10,7 +10,7 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "CloudHub - Unified Cloud Dashboard",
+  title: "NeuronNook - Unified Cloud Dashboard",
   description: "Connect and manage your Google and Microsoft cloud services in one place",
   generator: "v0.app",
 }
