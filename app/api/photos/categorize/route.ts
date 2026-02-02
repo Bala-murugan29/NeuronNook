@@ -81,6 +81,7 @@ Base your categorization on the filename, date, and location context. Be creativ
         }
       } catch (e) {
         console.error("Failed to parse batch response:", e)
+      }
     }
 
     return NextResponse.json({ categorizations: results })
