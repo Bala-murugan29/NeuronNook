@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSessionToken, verifySession } from "@/lib/auth"
-import Anthropic from "@anthropic-ai/sdk"
+import { GoogleGenerativeAI } from "@google/generative-ai"
 
 export const maxDuration = 60
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-})
+const genAI = process.env.GOOGLE_GEMINI_API_KEY
+  ? new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
+  : null
 
 export async function POST(request: NextRequest) {
   const token = await getSessionToken()
@@ -62,29 +62,25 @@ Respond ONLY with valid JSON in this exact format:
 
 Base your categorization on the filename, date, and location context. Be creative and descriptive with common names.`
 
-      const message = await client.messages.create({
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: 2048,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      })
-
-      const content = message.content[0]
-      if (content.type === "text") {
-        try {
-          const jsonMatch = content.text.match(/\{[\s\S]*\}/)
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0])
-            Object.assign(results, parsed)
-          }
-        } catch (e) {
-          console.error("Failed to parse batch response:", e)
-        }
+      if (!genAI) {
+        return NextResponse.json(
+          { error: "Gemini API key not configured" },
+          { status: 500 }
+        )
       }
+
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
+      const result = await model.generateContent(prompt)
+      const responseText = result.response.text()
+
+      try {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0])
+          Object.assign(results, parsed)
+        }
+      } catch (e) {
+        console.error("Failed to parse batch response:", e)
     }
 
     return NextResponse.json({ categorizations: results })

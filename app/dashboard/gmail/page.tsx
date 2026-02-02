@@ -7,9 +7,21 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { GmailIcon, LinkIcon } from "@/components/icons"
-import { Loader2, RefreshCw, Mail, Briefcase, AlertTriangle, Sparkles, ExternalLink } from "lucide-react"
+import { Loader2, RefreshCw, Mail, Briefcase, AlertTriangle, Sparkles, ExternalLink, Bot, Trash2 } from "lucide-react"
 import { AIInsightsCard } from "@/components/dashboard/ai-insights"
 import type { Email } from "@/lib/types"
 
@@ -26,6 +38,15 @@ export default function GmailPage() {
   const [isCategorizing, setIsCategorizing] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
   const [error, setError] = useState<string | null>(null)
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const [assistantTo, setAssistantTo] = useState("")
+  const [assistantPrompt, setAssistantPrompt] = useState("")
+  const [assistantDraft, setAssistantDraft] = useState<{ subject: string; body: string } | null>(null)
+  const [assistantError, setAssistantError] = useState<string | null>(null)
+  const [isGeneratingDraft, setIsGeneratingDraft] = useState(false)
+  const [isSendingDraft, setIsSendingDraft] = useState(false)
+  const [assistantSent, setAssistantSent] = useState(false)
 
   const fetchEmails = useCallback(async () => {
     if (!user?.googleConnected) return
@@ -51,6 +72,114 @@ export default function GmailPage() {
   useEffect(() => {
     fetchEmails()
   }, [fetchEmails])
+
+  const resetAssistant = () => {
+    setAssistantTo("")
+    setAssistantPrompt("")
+    setAssistantDraft(null)
+    setAssistantError(null)
+    setIsGeneratingDraft(false)
+    setIsSendingDraft(false)
+    setAssistantSent(false)
+  }
+
+  const deleteEmail = async (emailId: string) => {
+    setDeletingIds((prev) => new Set([...prev, emailId]))
+
+    try {
+      const res = await fetch("/api/gmail/delete", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailId }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || "Failed to delete email")
+      }
+
+      // Remove the email from the list
+      setEmails((prev) => prev.filter((e) => e.id !== emailId))
+    } catch (err) {
+      console.error("Delete error:", err)
+      setError(err instanceof Error ? err.message : "Failed to delete email")
+    } finally {
+      setDeletingIds((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(emailId)
+        return newSet
+      })
+    }
+  }
+
+  const handleAssistantOpenChange = (open: boolean) => {
+    setAssistantOpen(open)
+    if (!open) resetAssistant()
+  }
+
+  const generateAssistantDraft = async () => {
+    if (!assistantTo.trim() || !assistantPrompt.trim()) {
+      setAssistantError("Please provide recipient and content.")
+      return
+    }
+
+    setAssistantError(null)
+    setAssistantSent(false)
+    setIsGeneratingDraft(true)
+
+    try {
+      const res = await fetch("/api/gmail/assistant/generate", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: assistantTo.trim(), prompt: assistantPrompt.trim() }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || "Failed to generate draft")
+      }
+
+      const data = await res.json()
+      setAssistantDraft({ subject: data.subject, body: data.body })
+    } catch (err) {
+      setAssistantError(err instanceof Error ? err.message : "Failed to generate draft")
+    } finally {
+      setIsGeneratingDraft(false)
+    }
+  }
+
+  const sendAssistantDraft = async () => {
+    if (!assistantDraft) return
+
+    setAssistantError(null)
+    setIsSendingDraft(true)
+
+    try {
+      const res = await fetch("/api/gmail/assistant/send", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: assistantTo.trim(),
+          subject: assistantDraft.subject,
+          body: assistantDraft.body,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || "Failed to send email")
+      }
+
+      setAssistantSent(true)
+    } catch (err) {
+      setAssistantError(err instanceof Error ? err.message : "Failed to send email")
+    } finally {
+      setIsSendingDraft(false)
+    }
+  }
 
   const categorizeWithAI = async () => {
     if (emails.length === 0) return
@@ -139,6 +268,88 @@ export default function GmailPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Dialog open={assistantOpen} onOpenChange={handleAssistantOpenChange}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="bg-transparent">
+                <Bot className="h-4 w-4 mr-2" />
+                AI Assistant
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Gmail AI Assistant</DialogTitle>
+                <DialogDescription>
+                  Tell me who to email and what you want to say. I’ll draft the message for your approval.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="assistant-to">Recipient email</Label>
+                  <Input
+                    id="assistant-to"
+                    type="email"
+                    placeholder="name@example.com"
+                    value={assistantTo}
+                    onChange={(event) => setAssistantTo(event.target.value)}
+                    disabled={isGeneratingDraft || isSendingDraft || assistantSent}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="assistant-prompt">What should the email say?</Label>
+                  <Textarea
+                    id="assistant-prompt"
+                    placeholder="Example: Follow up on yesterday’s meeting and ask for the updated proposal by Friday."
+                    value={assistantPrompt}
+                    onChange={(event) => setAssistantPrompt(event.target.value)}
+                    rows={5}
+                    disabled={isGeneratingDraft || isSendingDraft || assistantSent}
+                  />
+                </div>
+              </div>
+
+              {assistantDraft && (
+                <Card className="bg-secondary/30 border-border">
+                  <CardContent className="pt-6 space-y-2">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Subject</p>
+                      <p className="text-sm font-medium text-card-foreground">{assistantDraft.subject}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Body</p>
+                      <p className="text-sm text-card-foreground whitespace-pre-wrap">{assistantDraft.body}</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Is this okay to send?</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {assistantError && <p className="text-sm text-destructive">{assistantError}</p>}
+              {assistantSent && <p className="text-sm text-green-500">Email sent successfully.</p>}
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={resetAssistant}
+                  disabled={isGeneratingDraft || isSendingDraft}
+                >
+                  Reset
+                </Button>
+                {!assistantDraft ? (
+                  <Button onClick={generateAssistantDraft} disabled={isGeneratingDraft || isSendingDraft}>
+                    {isGeneratingDraft ? "Generating..." : "Generate Draft"}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={sendAssistantDraft}
+                    disabled={isSendingDraft || assistantSent}
+                  >
+                    {isSendingDraft ? "Sending..." : assistantSent ? "Sent" : "Looks good, send"}
+                  </Button>
+                )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Button variant="outline" onClick={fetchEmails} disabled={isLoading} className="bg-transparent">
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
@@ -207,7 +418,12 @@ export default function GmailPage() {
           ) : (
             <div className="space-y-2">
               {filteredEmails.map((email) => (
-                <EmailCard key={email.id} email={email} />
+                <EmailCard
+                  key={email.id}
+                  email={email}
+                  isDeleting={deletingIds.has(email.id)}
+                  onDelete={() => deleteEmail(email.id)}
+                />
               ))}
             </div>
           )}
@@ -243,7 +459,15 @@ function StatsCard({
   )
 }
 
-function EmailCard({ email }: { email: CategorizedEmail }) {
+function EmailCard({
+  email,
+  isDeleting = false,
+  onDelete,
+}: {
+  email: CategorizedEmail
+  isDeleting?: boolean
+  onDelete?: () => void
+}) {
   const categoryColors = {
     personal: "bg-blue-500/20 text-blue-400 border-blue-500/30",
     work: "bg-green-500/20 text-green-400 border-green-500/30",
@@ -279,14 +503,26 @@ function EmailCard({ email }: { email: CategorizedEmail }) {
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             <span className="text-xs text-muted-foreground">{formatDate(email.date)}</span>
-            <a
-              href={`https://mail.google.com/mail/u/0/#inbox/${email.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:text-primary/80"
-            >
-              <ExternalLink className="h-4 w-4" />
-            </a>
+            <div className="flex gap-2">
+              {email.aiCategory === "spam_promotion" && onDelete && (
+                <button
+                  onClick={onDelete}
+                  disabled={isDeleting}
+                  className="text-destructive hover:text-destructive/80 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Delete email"
+                >
+                  <Trash2 className={`h-4 w-4 ${isDeleting ? "animate-pulse" : ""}`} />
+                </button>
+              )}
+              <a
+                href={`https://mail.google.com/mail/u/0/#inbox/${email.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary/80"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </div>
           </div>
         </div>
       </CardContent>
