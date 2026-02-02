@@ -34,7 +34,6 @@ const sessionCookieOptions = {
   sameSite: "lax" as const,
   maxAge: 60 * 60 * 24 * 7, // 7 days
   path: "/",
-  domain: process.env.NODE_ENV === "production" ? ".vercel.app" : undefined,
 }
 
 export async function setSessionCookie(token: string, response?: NextResponse) {

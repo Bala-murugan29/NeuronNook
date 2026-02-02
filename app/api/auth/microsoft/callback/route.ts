@@ -111,7 +111,13 @@ export async function GET(request: NextRequest) {
     const sessionToken = await createSession(user)
 
     const response = NextResponse.redirect(new URL("/dashboard", request.url))
-    await setSessionCookie(sessionToken, response)
+    response.cookies.set("session", sessionToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+    })
 
     return response
   } catch (error) {
