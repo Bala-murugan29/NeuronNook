@@ -1,12 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSessionToken, verifySession } from "@/lib/auth"
-import { GoogleGenerativeAI } from "@google/generative-ai"
+import { callNvidiaNim } from "@/lib/ai-categorize"
 
 export const maxDuration = 60
-
-const genAI = process.env.GOOGLE_GEMINI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
-  : null
 
 export async function POST(request: NextRequest) {
   const token = await getSessionToken()
@@ -62,16 +58,15 @@ Respond ONLY with valid JSON in this exact format:
 
 Base your categorization on the filename, date, and location context. Be creative and descriptive with common names.`
 
-      if (!genAI) {
+      let responseText: string
+      try {
+        responseText = await callNvidiaNim(prompt)
+      } catch (err) {
         return NextResponse.json(
-          { error: "Gemini API key not configured" },
+          { error: err instanceof Error ? err.message : "NVIDIA NIM API key not configured" },
           { status: 500 }
         )
       }
-
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
-      const result = await model.generateContent(prompt)
-      const responseText = result.response.text()
 
       try {
         const jsonMatch = responseText.match(/\{[\s\S]*\}/)

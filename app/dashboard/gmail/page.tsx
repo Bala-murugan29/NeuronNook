@@ -195,7 +195,7 @@ export default function GmailPage() {
         snippet: e.snippet,
       }))
 
-      const endpoint = "/api/gmail/categorize-gemini"
+      const endpoint = "/api/gmail/categorize-nim"
       const res = await fetch(endpoint, {
         method: "POST",
         credentials: "include",
@@ -356,7 +356,7 @@ export default function GmailPage() {
           </Button>
           <Button onClick={categorizeWithAI} disabled={isCategorizing || emails.length === 0}>
             <Sparkles className={`h-4 w-4 mr-2 ${isCategorizing ? "animate-pulse" : ""}`} />
-            {isCategorizing ? "Categorizing with Gemini..." : "Categorize with Gemini"}
+            {isCategorizing ? "Categorizing with NVIDIA NIM..." : "Categorize with NVIDIA NIM"}
           </Button>
         </div>
       </div>

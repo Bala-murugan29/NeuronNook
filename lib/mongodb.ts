@@ -19,7 +19,7 @@ export async function getDb(): Promise<Db> {
 
   console.log("[MongoDB] Creating new connection to:", dbName)
   try {
-    const client = new MongoClient(uri)
+    const client = new MongoClient(uri!)
     console.log("[MongoDB] Connecting to MongoDB Atlas...")
     await client.connect()
     console.log("[MongoDB] Connected successfully!")

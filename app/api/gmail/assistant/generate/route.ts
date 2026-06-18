@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { GoogleGenerativeAI } from "@google/generative-ai"
+import { callNvidiaNim } from "@/lib/ai-categorize"
 import { getSessionToken, verifySession } from "@/lib/auth"
 import { dbRecordToUser, findUserByEmail } from "@/lib/db"
-
-const genAI = process.env.GOOGLE_GEMINI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
-  : null
 
 function extractJson(text: string) {
   const match = text.match(/\{[\s\S]*\}/)
@@ -35,9 +31,7 @@ export async function POST(request: NextRequest) {
 
   const user = dbRecordToUser(userRecord)
 
-  if (!genAI) {
-    return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500 })
-  }
+  // Will rely on callNvidiaNim checking NVIDIA_API_KEY
 
   let payload: { to?: string; prompt?: string } = {}
   try {
@@ -54,8 +48,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
-
     const aiPrompt = `You are an email assistant. Draft a concise, professional email on behalf of ${user.name} (${user.email}).
 Recipient: ${to}
 User intent: ${prompt}
@@ -71,8 +63,12 @@ Guidelines:
 - Keep the tone friendly and clear.
 - End with the sender name: ${user.name}`
 
-    const result = await model.generateContent(aiPrompt)
-    const responseText = result.response.text()
+    let responseText: string
+    try {
+      responseText = await callNvidiaNim(aiPrompt)
+    } catch (err) {
+      return NextResponse.json({ error: err instanceof Error ? err.message : "NVIDIA NIM API key not configured" }, { status: 500 })
+    }
     const parsed = extractJson(responseText)
 
     if (!parsed?.subject || !parsed?.body) {

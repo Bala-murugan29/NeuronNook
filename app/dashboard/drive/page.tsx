@@ -78,7 +78,7 @@ export default function DrivePage() {
         mimeType: f.mimeType,
       }))
 
-      const endpoint = "/api/drive/categorize-gemini"
+      const endpoint = "/api/drive/categorize-nim"
       const res = await fetch(endpoint, {
         method: "POST",
         credentials: "include",
@@ -155,7 +155,7 @@ export default function DrivePage() {
           </Button>
           <Button onClick={categorizeWithAI} disabled={isCategorizing || files.length === 0}>
             <Sparkles className={`h-4 w-4 mr-2 ${isCategorizing ? "animate-pulse" : ""}`} />
-            {isCategorizing ? "Categorizing with Gemini..." : "Categorize with Gemini"}
+            {isCategorizing ? "Categorizing with NVIDIA NIM..." : "Categorize with NVIDIA NIM"}
           </Button>
         </div>
       </div>

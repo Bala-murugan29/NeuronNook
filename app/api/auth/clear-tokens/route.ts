@@ -25,15 +25,15 @@ export async function POST(request: NextRequest) {
   try {
     // Clear Google tokens from the database
     await updateUser(userRecord.id, {
-      googleAccessToken: null,
-      googleRefreshToken: null,
+      googleAccessToken: undefined,
+      googleRefreshToken: undefined,
       googleConnected: false,
     })
 
     // Also clear Microsoft tokens if present
     await updateUser(userRecord.id, {
-      microsoftAccessToken: null,
-      microsoftRefreshToken: null,
+      microsoftAccessToken: undefined,
+      microsoftRefreshToken: undefined,
       microsoftConnected: false,
     })
 

@@ -1,11 +1,45 @@
 import { generateObject } from "ai"
 import { z } from "zod"
-import { GoogleGenerativeAI } from "@google/generative-ai"
-
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
-const GEMINI_API_KEY = process.env.GOOGLE_GEMINI_API_KEY
+const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || process.env.NIM_API_KEY
+const NVIDIA_NIM_MODEL = process.env.NVIDIA_NIM_MODEL || "meta/llama-3.1-8b-instruct"
 
-const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null
+export async function callNvidiaNim(prompt: string, options?: { model?: string }): Promise<string> {
+  const apiKey = NVIDIA_API_KEY
+  if (!apiKey) {
+    throw new Error("NVIDIA API key not configured. Please set NVIDIA_API_KEY in .env")
+  }
+
+  const modelName = options?.model || NVIDIA_NIM_MODEL
+
+  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: modelName,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      top_p: 0.7,
+      max_tokens: 1024,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => "")
+    throw new Error(`NVIDIA NIM API error (${response.status}): ${response.statusText}. ${errorBody}`)
+  }
+
+  const data = await response.json()
+  const content = data?.choices?.[0]?.message?.content
+  if (!content) {
+    throw new Error("NVIDIA NIM returned an empty response")
+  }
+
+  return content
+}
 
 // Email categorization schema
 const emailCategorySchema = z.object({
@@ -138,19 +172,13 @@ export async function categorizeFiles(
   return results
 }
 
-// Gemini AI functions
-export async function categorizeEmailWithGemini(email: {
+// NVIDIA NIM AI functions
+export async function categorizeEmailWithNvidiaNim(email: {
   from: string
   subject: string
   snippet: string
 }): Promise<z.infer<typeof emailCategorySchema>> {
-  if (!genAI) {
-    throw new Error("Gemini API key not configured. Please set GOOGLE_GEMINI_API_KEY in .env")
-  }
-
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
-
     const prompt = `Categorize this email into one of three categories:
 - personal: Personal emails from friends, family, personal subscriptions, personal notifications
 - work: Work-related emails, professional correspondence, business communications, work notifications
@@ -168,8 +196,7 @@ Respond in JSON format with the following structure:
   "reasoning": "Brief explanation"
 }`
 
-    const result = await model.generateContent(prompt)
-    const responseText = result.response.text()
+    const responseText = await callNvidiaNim(prompt)
     
     // Extract JSON from response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
@@ -182,15 +209,15 @@ Respond in JSON format with the following structure:
     return {
       category: parsed.category as "personal" | "work" | "spam_promotion",
       confidence: Math.min(1, Math.max(0, parsed.confidence || 0.5)),
-      reasoning: parsed.reasoning || "Categorized by Gemini AI",
+      reasoning: parsed.reasoning || "Categorized by NVIDIA NIM",
     }
   } catch (error) {
-    console.error("Gemini email categorization error:", error)
+    console.error("NVIDIA NIM email categorization error:", error)
     throw error
   }
 }
 
-export async function categorizeEmailsWithGemini(
+export async function categorizeEmailsWithNvidiaNim(
   emails: Array<{ id: string; from: string; subject: string; snippet: string }>,
 ): Promise<Map<string, z.infer<typeof emailCategorySchema>>> {
   const results = new Map<string, z.infer<typeof emailCategorySchema>>()
@@ -201,16 +228,16 @@ export async function categorizeEmailsWithGemini(
     const batch = emails.slice(i, i + batchSize)
     const promises = batch.map(async (email) => {
       try {
-        const result = await categorizeEmailWithGemini(email)
+        const result = await categorizeEmailWithNvidiaNim(email)
         return { id: email.id, result }
       } catch (error) {
-        console.error(`Failed to categorize email ${email.id} with Gemini:`, error)
+        console.error(`Failed to categorize email ${email.id} with NVIDIA NIM:`, error)
         return {
           id: email.id,
           result: {
             category: "personal" as const,
             confidence: 0.5,
-            reasoning: "Failed to categorize with Gemini, defaulting to personal",
+            reasoning: "Failed to categorize with NVIDIA NIM, defaulting to personal",
           },
         }
       }
@@ -225,16 +252,10 @@ export async function categorizeEmailsWithGemini(
   return results
 }
 
-export async function categorizeFileWithGemini(file: {
+export async function categorizeFileWithNvidiaNim(file: {
   name: string
   mimeType: string
 }): Promise<z.infer<typeof fileCategorySchema>> {
-  if (!genAI) {
-    throw new Error("Gemini API key not configured")
-  }
-
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
-
   const prompt = `Categorize this file into one of three categories:
 - personal: Personal files like photos, personal documents, entertainment, personal projects
 - work: Work-related documents, spreadsheets, presentations, professional materials
@@ -252,8 +273,7 @@ Respond in JSON format with the following structure:
 }`
 
   try {
-    const result = await model.generateContent(prompt)
-    const responseText = result.response.text()
+    const responseText = await callNvidiaNim(prompt)
     
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
@@ -265,19 +285,19 @@ Respond in JSON format with the following structure:
     return {
       category: parsed.category as "personal" | "work" | "useless",
       confidence: Math.min(1, Math.max(0, parsed.confidence || 0.5)),
-      reasoning: parsed.reasoning || "Categorized by Gemini AI",
+      reasoning: parsed.reasoning || "Categorized by NVIDIA NIM",
     }
   } catch (error) {
-    console.error("Gemini file categorization error:", error)
+    console.error("NVIDIA NIM file categorization error:", error)
     return {
       category: "personal",
       confidence: 0.5,
-      reasoning: "Failed to categorize with Gemini, defaulting to personal",
+      reasoning: "Failed to categorize with NVIDIA NIM, defaulting to personal",
     }
   }
 }
 
-export async function categorizeFilesWithGemini(
+export async function categorizeFilesWithNvidiaNim(
   files: Array<{ id: string; name: string; mimeType: string }>,
 ): Promise<Map<string, z.infer<typeof fileCategorySchema>>> {
   const results = new Map<string, z.infer<typeof fileCategorySchema>>()
@@ -287,16 +307,16 @@ export async function categorizeFilesWithGemini(
     const batch = files.slice(i, i + batchSize)
     const promises = batch.map(async (file) => {
       try {
-        const result = await categorizeFileWithGemini(file)
+        const result = await categorizeFileWithNvidiaNim(file)
         return { id: file.id, result }
       } catch (error) {
-        console.error(`Failed to categorize file ${file.id} with Gemini:`, error)
+        console.error(`Failed to categorize file ${file.id} with NVIDIA NIM:`, error)
         return {
           id: file.id,
           result: {
             category: "personal" as const,
             confidence: 0.5,
-            reasoning: "Failed to categorize with Gemini, defaulting to personal",
+            reasoning: "Failed to categorize with NVIDIA NIM, defaulting to personal",
           },
         }
       }
@@ -311,7 +331,7 @@ export async function categorizeFilesWithGemini(
   return results
 }
 
-// Dashboard analytics using Gemini
+// Dashboard analytics using NVIDIA NIM
 export interface DashboardInsights {
   summary: string
   keyMetrics: {
@@ -331,12 +351,6 @@ export async function generateDashboardInsights(
     items: Array<{ category: string; confidence: number }>
   },
 ): Promise<DashboardInsights> {
-  if (!genAI) {
-    throw new Error("Gemini API key not configured")
-  }
-
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
-
   // Calculate metrics
   const totalItems = dashboardData.items.length
   const personalItems = dashboardData.items.filter((i) => i.category === "personal").length
@@ -361,8 +375,7 @@ Provide a brief professional summary (1-2 sentences) and one actionable recommen
 }`
 
   try {
-    const result = await model.generateContent(prompt)
-    const responseText = result.response.text()
+    const responseText = await callNvidiaNim(prompt)
     
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
