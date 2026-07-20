@@ -16,7 +16,7 @@ export async function getDb(): Promise<Db> {
     console.log("[MongoDB] Using cached connection")
     return cachedDb
   }
-
+ 
   console.log("[MongoDB] Creating new connection to:", dbName)
   try {
     const client = new MongoClient(uri!)

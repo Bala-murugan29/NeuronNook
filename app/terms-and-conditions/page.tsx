@@ -141,7 +141,14 @@ export default function TermsAndConditions() {
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold mb-4">13. Contact Us</h2>
+                <h2 className="text-2xl font-semibold mb-4">13. Privacy Policy & Google User Data</h2>
+                <p className="text-foreground mb-4">
+                  For detailed information on how we access, use, store, and share your data—including Google User Data—please review our full <a href="/privacy-policy" className="text-primary hover:underline">Privacy Policy</a>. By using NeuronNook, you also agree to the terms outlined in our Privacy Policy.
+                </p>
+              </section>
+
+              <section>
+                <h2 className="text-2xl font-semibold mb-4">14. Contact Us</h2>
                 <p className="text-foreground mb-4">
                   If you have any questions about these Terms and Conditions, please contact us
                   through the contact information provided on our website.
